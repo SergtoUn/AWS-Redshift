@@ -74,7 +74,7 @@ PRIMARY KEY (songplay_id));
 
 user_table_create = ("""
 CREATE TABLE IF NOT EXISTS users(
-user_id      text PRIMARY KEY, 
+user_id      text, 
 first_name   text NOT NULL, 
 last_name    text NOT NULL, 
 gender       text, 
