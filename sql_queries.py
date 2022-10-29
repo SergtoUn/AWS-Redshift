@@ -47,8 +47,8 @@ staging_songs_table_create = ("""
 CREATE TABLE IF NOT EXISTS staging_songs(
 num_songs        int,
 artist_id        text,
-artist_latitude  text,
-artist_longitude text, 
+artist_latitude  decimal,
+artist_longitude decimal, 
 artist_location  text, 
 artist_name      text,
 song_id          text,
@@ -68,16 +68,18 @@ song_id       text,
 artist_id     text, 
 session_id    text NOT NULL, 
 location      text, 
-user_agent    text);
+user_agent    text,
+PRIMARY KEY (songplay_id));
 """)
 
 user_table_create = ("""
 CREATE TABLE IF NOT EXISTS users(
-user_id      text, 
+user_id      text PRIMARY KEY, 
 first_name   text NOT NULL, 
 last_name    text NOT NULL, 
 gender       text, 
-level        text) diststyle all;
+level        text,
+PRIMARY KEY(user_id)) diststyle all;
 """)
 
 song_table_create = ("""CREATE TABLE IF NOT EXISTS songs(
@@ -85,15 +87,17 @@ song_id      text NOT NULL,
 title        text NOT NULL, 
 artist_id    text, 
 year         int, 
-duration     float NOT NULL) diststyle all;
+duration     float NOT NULL,
+PRIMARY KEY(song_id)) diststyle all;
 """)
 
 artist_table_create = ("""CREATE TABLE IF NOT EXISTS artists(
 artist_id    text NOT NULL sortkey, 
 name         text NOT NULL, 
 location     text, 
-latitude     text, 
-longitude    text) diststyle all;
+latitude     decimal, 
+longitude    decimal,
+PRIMARY KEY (artist_id)) diststyle all;
 """)
 
 time_table_create = ("""CREATE TABLE IF NOT EXISTS time(
@@ -103,7 +107,8 @@ day          int,
 week         int, 
 month        int, 
 year         int, 
-weekday      text
+weekday      text,
+PRIMARY KEY (start_time)
 ) diststyle all;
 """)
 
@@ -118,8 +123,8 @@ FORMAT AS JSON 'auto'
 staging_events_copy = ("""
 COPY staging_events
 FROM {} iam_role '{}' 
-FORMAT AS JSON 's3://udacity-dend/log_json_path.json' 
-""").format(LOG_DATA, DWH_ROLE_ARN)
+FORMAT AS JSON {} 
+""").format(LOG_DATA, DWH_ROLE_ARN, config.get("S3","LOG_JSONPATH"))
 
 # FINAL TABLES
 
@@ -143,6 +148,7 @@ SELECT se.ts,
                 end::text AS user_agent
 FROM   staging_events se left join staging_songs ss
        on se.song=ss.title and se.artist=ss.artist_name
+WHERE se.page LIKE 'NextSong'
 """)
 
 user_table_insert = ("""
@@ -175,7 +181,7 @@ FROM
            FROM staging_events
 		   GROUP BY userId
          ) t1 JOIN staging_events AS se ON t1.userId = se.userId AND se.ts = t1.mts
-;
+WHERE se.page LIKE 'NextSong';
 """)
 
 song_table_insert = ("""
@@ -186,17 +192,12 @@ FROM staging_songs;
 
 artist_table_insert = ("""
 INSERT INTO artists (artist_id, name, location, latitude, longitude)
-SELECT artist_id, artist_name, artist_location, 
-           CASE
-                WHEN ss.artist_latitude is not NULL
-                THEN CAST(ss.artist_latitude AS text)
-                ELSE CAST('N/A' AS text)
-                end::text AS latitude,
-           CASE
-                WHEN ss.artist_longitude is not NULL 
-                THEN CAST(ss.artist_longitude AS text)
-                ELSE CAST('N/A' AS text)
-                end::text AS longitude
+SELECT artist_id, 
+       artist_name, 
+       artist_location, 
+       CAST (ss.artist_latitude AS decimal(9,6)),            
+       CAST (ss.artist_longitude AS decimal(9,6))
+                      
 FROM staging_songs AS ss;
 """)
 
@@ -211,7 +212,7 @@ select distinct
        extract('year' from (timestamp 'epoch' + CAST(se.ts AS BIGINT)/1000 * interval '1 second')) as year,
        extract('weekday' from (timestamp 'epoch' + CAST(se.ts AS BIGINT)/1000 * interval '1 second')) as weekday
 from staging_events se
-WHERE se.ts is not NULL
+WHERE se.ts is not NULL AND se.page LIKE 'NextSong';
 """)
 
 # QUERY LISTS
