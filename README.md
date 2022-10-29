@@ -22,7 +22,7 @@ Columns: artist_id, name, location, lattitude, longitude
 Columns: start_time, hour, day, week, month, year, weekday
 
 ## How to run
-Run the following scripts - the ones that have the same numbers can be run in parallel
+Run the following scripts
 - 1) AWS.py - to create Redshift cluster and role
 - 2) create_tables.py - creates the 5 tables mentioned abode
 - 3) etl.py -connects to the redshift database, loads log_data and song_data into staging tables, and transforms them into the five tables.
